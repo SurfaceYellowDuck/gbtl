@@ -50,6 +50,9 @@ endif()
 
 message("Configured platform: ${PLATFORM}")
 
+find_package(Boost REQUIRED)
+include_directories(${CMAKE_SOURCE_DIR} ${PLATFORM_SOURCE_DIR} ${Boost_INCLUDE_DIRS})
+
 # https://stackoverflow.com/questions/14306642/adding-multiple-executables-in-cmake
 
 # This seems hokey that we need to include the root as our directory
