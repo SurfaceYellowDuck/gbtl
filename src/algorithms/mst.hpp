@@ -48,7 +48,7 @@ namespace algorithms
     }
 
     //************************************************************************
-    template<typename D1, typename D2 = D1, typename D3 = D1>
+    template <typename D1, typename D2 = D1, typename D3 = D1>
     struct MSTPlus
     {
         inline D3 operator()(D1 const &lhs, MSTType<D2> const &rhs)
@@ -58,7 +58,7 @@ namespace algorithms
     };
 
     //************************************************************************
-    template<typename D1>
+    template <typename D1>
     struct MSTMin
     {
         inline MSTType<D1> operator()(MSTType<D1> const &lhs,
@@ -67,7 +67,6 @@ namespace algorithms
             return (rhs.second > lhs.second) ? lhs : rhs;
         }
     };
-
 
     //************************************************************************
     /// position of a single minimum element in vector
@@ -119,9 +118,9 @@ namespace algorithms
      *         followed by a parent list containing the edges in the
      *         minimum spanning tree.
      */
-    template<typename MatrixT>
+    template <typename MatrixT>
     typename MatrixT::ScalarType mst(
-        MatrixT const               &graph,
+        MatrixT const &graph,
         grb::Vector<grb::IndexType> &mst_parents)
     {
         using T = typename MatrixT::ScalarType;
@@ -133,7 +132,7 @@ namespace algorithms
         {
             throw grb::DimensionException();
         }
-        //grb::print_matrix(std::cout, graph, "GRAPH***");
+        // grb::print_matrix(std::cout, graph, "GRAPH***");
 
         // Create an adjacency matrix of the correct type (combining
         // source vertex ID with edge weight
@@ -148,82 +147,117 @@ namespace algorithms
         }
         grb::Matrix<MSTType<T>> A(rows, cols);
         A.build(i, j, new_vals);
-        //grb::print_matrix(std::cout, A, "Hybrid A matrix");
+        // grb::print_matrix(std::cout, A, "Hybrid A matrix");
 
         // chose some arbitrary vertex to start
-        grb::IndexType const START_NODE = 0;
+        // grb::IndexType const START_NODE = 0;
 
+        // T weight = static_cast<T>(0);
+
+        // grb::Vector<MSTType<T>> d(rows);
+        // grb::Vector<bool> mask(rows);
+        // mask.setElement(START_NODE, true);
+        // //grb::print_vector(std::cout, mask, "Initial mask");
+
+        // // Using complement of mask so we don't deal with max()
+        // grb::Vector<T> s(rows);
+        // grb::assign(s,
+        //             grb::complement(mask),
+        //             grb::NoAccumulate(),
+        //             0, grb::AllIndices(), grb::REPLACE);
+        // //grb::print_vector(std::cout, s, "Initial s");
+
+        // mst_parents.clear();
+
+        // // Get the START NODE's neighbors
+        // grb::extract(d,
+        //              grb::NoMask(), // complement(mask)?
+        //              grb::NoAccumulate(),
+        //              grb::transpose(A),
+        //              grb::AllIndices(), START_NODE);
+        // grb::print_vector(std::cout, d, "Initial d");
         T weight = static_cast<T>(0);
-
-        grb::Vector<MSTType<T>> d(rows);
-        grb::Vector<bool> mask(rows);
-        mask.setElement(START_NODE, true);
-        //grb::print_vector(std::cout, mask, "Initial mask");
-
-        // Using complement of mask so we don't deal with max()
-        grb::Vector<T> s(rows);
-        grb::assign(s,
-                    grb::complement(mask),
-                    grb::NoAccumulate(),
-                    0, grb::AllIndices(), grb::REPLACE);
-        //grb::print_vector(std::cout, s, "Initial s");
-
+        grb::Vector<bool> mask(rows, false);
         mst_parents.clear();
-
-        // Get the START NODE's neighbors
-        grb::extract(d,
-                     grb::NoMask(), // complement(mask)?
-                     grb::NoAccumulate(),
-                     grb::transpose(A),
-                     grb::AllIndices(), START_NODE);
-        //grb::print_vector(std::cout, d, "Initial d");
-
-        while (mask.nvals() < rows)
+        for (grb::IndexType i = 0; i < rows; i++)
         {
-            //std::cout << "===================== ITERATION === s.nvals() = "
-            //          << s.nvals() << std::endl;
-            grb::Vector<T> temp(rows);
+            if (!mask.extractElement(i))
+            {
+                // grb::IndexType const START_NODE = 0;
 
-            // Note that eWiseMult is used with Plus b/c implied value is infinity
-            grb::eWiseMult(temp,
-                           grb::NoMask(),
-                           grb::NoAccumulate(),
-                           MSTPlus<T>(),
-                           s, d);
+                grb::Vector<MSTType<T>> d(rows);
+                mask.setElement(i, true);
+                // grb::print_vector(std::cout, mask, "Initial mask");
 
-            grb::IndexType u = argmin(temp);
-            //grb::print_vector(std::cout, temp, "-------- s + d.second");
-            //std::cout << "argmin(s + d.second) = " << u << std::endl;
+                // Using complement of mask so we don't deal with max()
+                grb::Vector<T> s(rows);
+                grb::assign(s,
+                            grb::complement(mask),
+                            grb::NoAccumulate(),
+                            0, grb::AllIndices(), grb::REPLACE);
+                // grb::print_vector(std::cout, s, "Initial s");
+                // Get the START NODE's neighbors
+                grb::extract(d,
+                             grb::NoMask(), // complement(mask)?
+                             grb::NoAccumulate(),
+                             grb::transpose(A),
+                             grb::AllIndices(), i);
+                grb::Vector<T> temp(rows);
 
-            mask.setElement(u, true);
-            //grb::print_vector(std::cout, mask, "-------- mask");
-            grb::apply(s,
-                       grb::complement(mask),
-                       grb::NoAccumulate(),
-                       grb::Identity<T>(),
-                       s, grb::REPLACE);
-            //grb::print_vector(std::cout, s, "-------- Seen vector");
-            auto idx_weight = d.extractElement(u);
-            weight += idx_weight.second;
-            mst_parents.setElement(u, idx_weight.first);
+                grb::eWiseMult(temp,
+                               grb::NoMask(),
+                               grb::NoAccumulate(),
+                               MSTPlus<T>(),
+                               s, d);
 
-            //grb::print_vector(std::cout, mst_parents, "-------- Parent list");
-            grb::Vector<MSTType<T>> Arow(cols);
-            grb::extract(Arow,
-                         grb::NoMask(), // complement(mask)?
-                         grb::NoAccumulate(),
-                         grb::transpose(A),
-                         grb::AllIndices(), u);
-            //grb::print_vector(std::cout, Arow, "-------- A(u,:)");
+                while (temp.nvals() != 0)
+                {
+                    // std::cout << "===================== ITERATION === s.nvals() = "
+                    //           << s.nvals() << std::endl;
 
-            grb::eWiseAdd(d,
-                          grb::NoMask(), //mask,?
-                          grb::NoAccumulate(),
-                          MSTMin<T>(),
-                          d, Arow);
-            //grb::print_vector(std::cout, d, "-------- d = d .min A(u,:)");
+                    // Note that eWiseMult is used with Plus b/c implied value is infinity
+
+                    grb::IndexType u = argmin(temp);
+                    // grb::print_vector(std::cout, temp, "-------- s + d.second");
+                    // std::cout << "argmin(s + d.second) = " << u << std::endl;
+
+                    mask.setElement(u, true);
+                    // grb::print_vector(std::cout, mask, "-------- mask");
+                    grb::apply(s,
+                               grb::complement(mask),
+                               grb::NoAccumulate(),
+                               grb::Identity<T>(),
+                               s, grb::REPLACE);
+                    // отметим нулями непосещенные,
+                    // grb::print_vector(std::cout, s, "-------- Seen vector");
+                    auto idx_weight = d.extractElement(u);
+                    weight += idx_weight.second;
+                    mst_parents.setElement(u, idx_weight.first);
+
+                    // grb::print_vector(std::cout, mst_parents, "-------- Parent list");
+                    grb::Vector<MSTType<T>> Arow(cols);
+                    grb::extract(Arow,
+                                 grb::NoMask(), // complement(mask)?
+                                 grb::NoAccumulate(),
+                                 grb::transpose(A),
+                                 grb::AllIndices(), u);
+                    // grb::print_vector(std::cout, Arow, "-------- A(u,:)");
+
+                    grb::eWiseAdd(d,
+                                  grb::NoMask(), // mask,?
+                                  grb::NoAccumulate(),
+                                  MSTMin<T>(),
+                                  d, Arow);
+                    // grb::print_vector(std::cout, d, "-------- d = d .min A(u,:)");
+
+                    grb::eWiseMult(temp,
+                                   grb::NoMask(),
+                                   grb::NoAccumulate(),
+                                   MSTPlus<T>(),
+                                   s, d);
+                }
+            }
         }
-
         return weight;
     }
 
